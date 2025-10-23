@@ -1,31 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Photo Upload</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📸 Upload a Photo</title>
   <style>
     body {
-      font-family: sans-serif;
-      text-align: center;
-      margin-top: 50px;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background-color: #fafafa;
+    }
+    h2 {
+      margin-bottom: 10px;
     }
     input, button {
       margin-top: 10px;
-      padding: 10px;
-      font-size: 16px;
     }
     #preview {
-      display: block;
-      width: 100%;
-      max-width: 300px;
-      margin: 10px auto;
+      margin-top: 15px;
+      width: 200px;
       border-radius: 8px;
-    }
-    #status {
-      color: green;
-      font-weight: bold;
-      margin-top: 10px;
+      display: none;
     }
   </style>
 </head>
@@ -33,62 +32,63 @@
 
   <h2>📸 Upload a Photo</h2>
 
-  <form id="uploadForm" method="POST" enctype="multipart/form-data">
-    <input type="file" id="file" name="file" accept="image/*" capture="environment" required>
-    <img id="preview" src="" alt="Preview" />
+  <form id="uploadForm">
+    <input type="file" id="file" name="file" accept="image/*" required><br>
+    <img id="preview" src="#" alt="Preview"><br>
     <button type="submit">Upload</button>
   </form>
 
-  <div id="status"></div>
+  <p id="status"></p>
 
   <script>
-    const form = document.getElementById("uploadForm");
-    const fileInput = document.getElementById("file");
-    const preview = document.getElementById("preview");
-    const status = document.getElementById("status");
+    const scriptURL = "https://script.google.com/macros/s/AKfycbwp2JI0E4RXT5Fh3uCKXlVd8Xx_WgfFygUTB4QzvFC7tpHOKRxldnGySocYORJoM1rnAQ/exec"; // 🔹 paste your web app URL here
 
-    // Show image preview (mobile & desktop)
-    fileInput.addEventListener("change", (event) => {
-      const file = event.target.files[0];
+    const form = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('file');
+    const preview = document.getElementById('preview');
+    const status = document.getElementById('status');
+
+    // Show preview before upload
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
       if (file) {
-        preview.src = URL.createObjectURL(file);
-        preview.style.display = "block";
+        const reader = new FileReader();
+        reader.onload = e => {
+          preview.src = e.target.result;
+          preview.style.display = "block";
+        };
+        reader.readAsDataURL(file);
+      } else {
+        preview.style.display = "none";
       }
     });
 
-    // Handle upload
-    form.addEventListener("submit", async (e) => {
+    // Upload handler
+    form.addEventListener('submit', e => {
       e.preventDefault();
-
       const file = fileInput.files[0];
       if (!file) {
-        alert("Please select a file first!");
+        alert("Please choose a file first!");
         return;
       }
-
-      status.textContent = "Uploading...";
 
       const formData = new FormData();
       formData.append("file", file);
 
-      try {
-        const response = await fetch(
-          "https://script.google.com/macros/s/AKfycbyFHo8W1hUAlHwKIsuRxRDNC38ahUYhU54-m-58YjDd8NiZXe9N-ochAtmyd7cINAK-Gg/exec",
-          {
-            method: "POST",
-            body: formData,
-            mode: "no-cors",
+      status.innerText = "Uploading...";
+      fetch(scriptURL, { method: "POST", body: formData })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            status.innerHTML = `✅ Uploaded! <a href="${data.url}" target="_blank">View File</a>`;
+          } else {
+            status.innerText = "❌ Upload failed: " + data.message;
           }
-        );
-
-        // Since "no-cors" mode hides the response, just assume success
-        status.textContent = "✅ Upload successful!";
-        fileInput.value = "";
-        preview.src = "";
-      } catch (err) {
-        console.error(err);
-        status.textContent = "❌ Upload failed. Please try again.";
-      }
+        })
+        .catch(err => {
+          console.error(err);
+          status.innerText = "⚠️ Error: " + err.message;
+        });
     });
   </script>
 
