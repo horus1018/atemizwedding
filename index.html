@@ -1,96 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>📸 Upload a Photo</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📸 Upload to Google Drive</title>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      background-color: #fafafa;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background-color: #f9f9f9;
     }
-    h2 {
-      margin-bottom: 10px;
-    }
-    input, button {
-      margin-top: 10px;
-    }
-    #preview {
+    video {
+      width: 90%;
+      max-width: 350px;
+      border-radius: 12px;
       margin-top: 15px;
-      width: 200px;
+      background: #000;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
       border-radius: 8px;
-      display: none;
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 15px;
+      font-weight: 600;
     }
   </style>
 </head>
 <body>
-
-  <h2>📸 Upload a Photo</h2>
-
-  <form id="uploadForm">
-    <input type="file" id="file" name="file" accept="image/*" required><br>
-    <img id="preview" src="#" alt="Preview"><br>
-    <button type="submit">Upload</button>
-  </form>
-
+  <h2>📸 Auto Upload to Google Drive</h2>
+  <video id="camera" autoplay playsinline></video><br />
+  <button id="startBtn">🎥 Start Camera</button>
+  <button id="switchBtn">🔄 Switch Camera</button>
+  <button id="captureBtn">📤 Take & Upload</button>
   <p id="status"></p>
 
   <script>
-    const scriptURL = "https://script.google.com/macros/s/AKfycbwp2JI0E4RXT5Fh3uCKXlVd8Xx_WgfFygUTB4QzvFC7tpHOKRxldnGySocYORJoM1rnAQ/exec"; // 🔹 paste your web app URL here
+    const video = document.getElementById("camera");
+    const startBtn = document.getElementById("startBtn");
+    const switchBtn = document.getElementById("switchBtn");
+    const captureBtn = document.getElementById("captureBtn");
+    const status = document.getElementById("status");
+    const scriptURL = "https://script.google.com/macros/s/AKfycbwp2JI0E4RXT5Fh3uCKXlVd8Xx_WgfFygUTB4QzvFC7tpHOKRxldnGySocYORJoM1rnAQ/exec";
 
-    const form = document.getElementById('uploadForm');
-    const fileInput = document.getElementById('file');
-    const preview = document.getElementById('preview');
-    const status = document.getElementById('status');
+    let currentFacing = "environment";
+    let stream = null;
 
-    // Show preview before upload
-    fileInput.addEventListener('change', () => {
-      const file = fileInput.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = e => {
-          preview.src = e.target.result;
-          preview.style.display = "block";
-        };
-        reader.readAsDataURL(file);
-      } else {
-        preview.style.display = "none";
+    async function startCamera() {
+      if (stream) stream.getTracks().forEach(track => track.stop());
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: currentFacing }
+        });
+        video.srcObject = stream;
+        status.innerText = "Camera ready ✅";
+      } catch (err) {
+        status.innerText = "⚠️ Camera error: " + err.message;
+        console.error(err);
       }
-    });
+    }
 
-    // Upload handler
-    form.addEventListener('submit', e => {
-      e.preventDefault();
-      const file = fileInput.files[0];
-      if (!file) {
-        alert("Please choose a file first!");
-        return;
-      }
+    switchBtn.onclick = () => {
+      currentFacing = currentFacing === "environment" ? "user" : "environment";
+      startCamera();
+    };
 
-      const formData = new FormData();
-      formData.append("file", file);
-
+    captureBtn.onclick = async () => {
+      if (!stream) return alert("Start the camera first!");
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       status.innerText = "Uploading...";
-      fetch(scriptURL, { method: "POST", body: formData })
-        .then(res => res.json())
-        .then(data => {
+
+      canvas.toBlob(async (blob) => {
+        const formData = new FormData();
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        formData.append("file", blob, `photo_${timestamp}.jpg`);
+
+        try {
+          const res = await fetch(scriptURL, { method: "POST", body: formData });
+          const data = await res.json();
           if (data.success) {
-            status.innerHTML = `✅ Uploaded! <a href="${data.url}" target="_blank">View File</a>`;
+            status.innerHTML = `✅ Uploaded! <a href="${data.url}" target="_blank">View</a>`;
           } else {
             status.innerText = "❌ Upload failed: " + data.message;
           }
-        })
-        .catch(err => {
-          console.error(err);
-          status.innerText = "⚠️ Error: " + err.message;
-        });
-    });
-  </script>
+        } catch (err) {
+          status.innerText = "⚠️ Upload error: " + err.message;
+        }
+      }, "image/jpeg");
+    };
 
+    startBtn.onclick = startCamera;
+  </script>
 </body>
 </html>
