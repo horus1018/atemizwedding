@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>📸 Upload to Google Drive</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📸 Live Camera Upload</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -11,7 +11,7 @@
       padding: 20px;
       background-color: #f9f9f9;
     }
-    video {
+    video, canvas {
       width: 90%;
       max-width: 350px;
       border-radius: 12px;
@@ -30,40 +30,40 @@
     }
     #status {
       margin-top: 15px;
-      font-weight: 600;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <h2>📸 Auto Upload to Google Drive</h2>
-  <video id="camera" autoplay playsinline></video><br />
-  <button id="startBtn">🎥 Start Camera</button>
+  <h2>📸 Live Camera - Take Photo & Upload</h2>
+  <video id="camera" autoplay playsinline></video>
+  <br>
   <button id="switchBtn">🔄 Switch Camera</button>
-  <button id="captureBtn">📤 Take & Upload</button>
+  <button id="captureBtn">📤 Capture & Upload</button>
   <p id="status"></p>
 
   <script>
+    const scriptURL = "https://script.google.com/macros/s/AKfycbwB-6Tk7Qu2gBgsDJ3waBjgDXZa_FQgEfaywAUfijp3XIPGol8rIkblsBjK8xzaXxwcSQ/exec"; // Replace this
     const video = document.getElementById("camera");
-    const startBtn = document.getElementById("startBtn");
     const switchBtn = document.getElementById("switchBtn");
     const captureBtn = document.getElementById("captureBtn");
     const status = document.getElementById("status");
-    const scriptURL = "https://script.google.com/macros/s/AKfycbwp2JI0E4RXT5Fh3uCKXlVd8Xx_WgfFygUTB4QzvFC7tpHOKRxldnGySocYORJoM1rnAQ/exec";
 
-    let currentFacing = "environment";
     let stream = null;
+    let currentFacing = "environment"; // Back camera by default
 
     async function startCamera() {
-      if (stream) stream.getTracks().forEach(track => track.stop());
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: currentFacing }
         });
         video.srcObject = stream;
-        status.innerText = "Camera ready ✅";
+        status.innerText = "📷 Camera is live";
       } catch (err) {
-        status.innerText = "⚠️ Camera error: " + err.message;
-        console.error(err);
+        status.innerText = "❌ Camera error: " + err.message;
       }
     }
 
@@ -73,12 +73,16 @@
     };
 
     captureBtn.onclick = async () => {
-      if (!stream) return alert("Start the camera first!");
+      if (!stream) {
+        alert("Camera not started!");
+        return;
+      }
       const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext("2d");
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
       status.innerText = "Uploading...";
 
       canvas.toBlob(async (blob) => {
@@ -90,17 +94,18 @@
           const res = await fetch(scriptURL, { method: "POST", body: formData });
           const data = await res.json();
           if (data.success) {
-            status.innerHTML = `✅ Uploaded! <a href="${data.url}" target="_blank">View</a>`;
+            status.innerHTML = `✅ Uploaded Successfully! <a href="${data.url}" target="_blank">View File</a>`;
           } else {
             status.innerText = "❌ Upload failed: " + data.message;
           }
         } catch (err) {
-          status.innerText = "⚠️ Upload error: " + err.message;
+          status.innerText = "❌ Upload error: " + err.message;
         }
       }, "image/jpeg");
     };
 
-    startBtn.onclick = startCamera;
+    // Start camera automatically
+    startCamera();
   </script>
 </body>
 </html>
