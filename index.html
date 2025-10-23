@@ -6,135 +6,119 @@
   <title>📸 Auto Upload to Google Drive</title>
   <style>
     body {
-      font-family: "Poppins", sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      background-color: #f2f5f9;
-      color: #222;
+      font-family: Arial, sans-serif;
       text-align: center;
+      background-color: #f2f5f7;
+      margin: 0;
+      padding: 40px;
     }
 
     h1 {
-      font-size: 1.8rem;
-      margin-bottom: 20px;
+      color: #333;
     }
 
-    video, canvas {
+    video, canvas, img {
+      border-radius: 10px;
+      border: 2px solid #ddd;
       width: 300px;
       height: 300px;
-      border-radius: 10px;
-      background: #000;
       object-fit: cover;
     }
 
-    .buttons {
-      margin-top: 15px;
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-    }
-
     button {
-      background-color: #007bff;
+      margin: 10px;
+      padding: 10px 20px;
       border: none;
-      padding: 10px 16px;
       border-radius: 8px;
+      background-color: #0d6efd;
       color: white;
-      font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s ease;
+      font-size: 15px;
     }
 
     button:hover {
-      background-color: #0056b3;
+      background-color: #0b5ed7;
     }
 
-    p {
+    #status {
       margin-top: 15px;
-      font-weight: 500;
-    }
-
-    .error {
-      color: red;
-      font-weight: bold;
-    }
-
-    .success {
-      color: green;
       font-weight: bold;
     }
   </style>
 </head>
 <body>
   <h1>📸 Auto Upload to Google Drive</h1>
+
   <video id="camera" autoplay playsinline></video>
-  <canvas id="snapshot" style="display:none;"></canvas>
-  <div class="buttons">
-    <button id="switch">🔄 Switch Camera</button>
-    <button id="capture">📷 Take & Upload</button>
-  </div>
-  <p id="status"></p>
+  <canvas id="canvas" style="display:none;"></canvas>
+  <br />
+
+  <button id="switchCamera">📷 Switch Camera</button>
+  <button id="takePhoto">📤 Take & Upload</button>
+
+  <div id="status"></div>
 
   <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzpw7-p5yeLh1dZYFKnXalKPVluRW80JNlVDGaZ253sL5DFpDWw1HWcwFM8JS8KtXWt9Q/exec";
-    
     const video = document.getElementById("camera");
-    const canvas = document.getElementById("snapshot");
-    const captureBtn = document.getElementById("capture");
-    const switchBtn = document.getElementById("switch");
-    const statusText = document.getElementById("status");
-    let currentStream;
-    let usingFrontCamera = true;
+    const canvas = document.getElementById("canvas");
+    const statusDiv = document.getElementById("status");
+    const switchBtn = document.getElementById("switchCamera");
+    const takeBtn = document.getElementById("takePhoto");
 
+    // Your Google Apps Script web app URL
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzpw7-p5yeLh1dZYFKnXalKPVluRW80JNlVDGaZ253sL5DFpDWw1HWcwFM8JS8KtXWt9Q/exec";
+
+    let currentStream;
+    let useFrontCamera = true;
+
+    // Start the camera
     async function startCamera() {
       if (currentStream) {
         currentStream.getTracks().forEach(track => track.stop());
       }
+
       const constraints = {
-        video: {
-          facingMode: usingFrontCamera ? "user" : "environment"
-        }
+        video: { facingMode: useFrontCamera ? "user" : "environment" },
       };
+
       try {
         currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = currentStream;
       } catch (err) {
         console.error("Camera error:", err);
-        statusText.innerHTML = "❌ Cannot access camera";
+        statusDiv.innerHTML = "⚠️ Cannot access camera";
       }
     }
 
+    // Switch between front/back camera
     switchBtn.addEventListener("click", () => {
-      usingFrontCamera = !usingFrontCamera;
+      useFrontCamera = !useFrontCamera;
       startCamera();
     });
 
-    captureBtn.addEventListener("click", async () => {
+    // Capture and upload photo
+    takeBtn.addEventListener("click", async () => {
+      const context = canvas.getContext("2d");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      statusText.textContent = "⏳ Uploading...";
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg"));
+      const imageData = canvas.toDataURL("image/jpeg");
 
-      const formData = new FormData();
-      formData.append("file", blob, "photo.jpg");
+      statusDiv.innerHTML = "⏳ Uploading...";
 
       try {
-        const response = await fetch(SCRIPT_URL, { method: "POST", body: formData });
-        if (response.ok) {
-          statusText.innerHTML = "✅ Upload complete!";
-          statusText.className = "success";
-        } else {
-          throw new Error(await response.text());
-        }
-      } catch (error) {
-        console.error(error);
-        statusText.innerHTML = "❌ Upload failed: " + error.message;
-        statusText.className = "error";
+        const response = await fetch(SCRIPT_URL, {
+          method: "POST",
+          body: new URLSearchParams({ image: imageData }),
+        });
+
+        const text = await response.text();
+        console.log(text);
+        statusDiv.innerHTML = "✅ Upload complete!";
+      } catch (err) {
+        console.error(err);
+        statusDiv.innerHTML = "❌ Upload failed!";
       }
     });
 
@@ -142,6 +126,3 @@
   </script>
 </body>
 </html>
-
-
-
