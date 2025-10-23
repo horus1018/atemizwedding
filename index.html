@@ -1,105 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Auto Upload Camera</title>
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    background: #f0f2f5;
-    text-align: center;
-    padding: 20px;
-  }
-  video, canvas {
-    width: 100%;
-    max-width: 420px;
-    border-radius: 10px;
-    background: #000;
-    margin-top: 10px;
-  }
-  button {
-    padding: 10px 15px;
-    margin: 8px;
-    border: none;
-    border-radius: 6px;
-    background: #007bff;
-    color: white;
-    font-size: 15px;
-    cursor: pointer;
-  }
-  #status {
-    margin-top: 15px;
-    color: #333;
-    font-weight: bold;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📸 Auto Upload to Google Drive</title>
+  <style>
+    body {
+      font-family: "Poppins", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background-color: #f2f5f9;
+      color: #222;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 20px;
+    }
+
+    video, canvas {
+      width: 300px;
+      height: 300px;
+      border-radius: 10px;
+      background: #000;
+      object-fit: cover;
+    }
+
+    .buttons {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    button {
+      background-color: #007bff;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    p {
+      margin-top: 15px;
+      font-weight: 500;
+    }
+
+    .error {
+      color: red;
+      font-weight: bold;
+    }
+
+    .success {
+      color: green;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
-  <h2>📸 Auto Upload to Google Drive</h2>
-  <video id="video" autoplay playsinline></video>
-  <canvas id="canvas" style="display:none;"></canvas>
-  <br>
-  <button id="switchCam">🔄 Switch Camera</button>
-  <button id="snap">📷 Take & Upload</button>
-  <p id="status">Initializing camera...</p>
+  <h1>📸 Auto Upload to Google Drive</h1>
+  <video id="camera" autoplay playsinline></video>
+  <canvas id="snapshot" style="display:none;"></canvas>
+  <div class="buttons">
+    <button id="switch">🔄 Switch Camera</button>
+    <button id="capture">📷 Take & Upload</button>
+  </div>
+  <p id="status"></p>
 
   <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const snapBtn = document.getElementById('snap');
-    const switchBtn = document.getElementById('switchCam');
-    const statusEl = document.getElementById('status');
-
-    const uploadURL = "YOUR_WEB_APP_URL_HERE"; // Replace with your Apps Script URL
-
-    let currentFacingMode = "environment";
-    let stream;
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyLbHxLJ88DiMJyEYcI9xFzhb_XRThre8qoFbK87oyhd5VWxCe1cciYG5NiNZWugnRVkA/exec";
+    
+    const video = document.getElementById("camera");
+    const canvas = document.getElementById("snapshot");
+    const captureBtn = document.getElementById("capture");
+    const switchBtn = document.getElementById("switch");
+    const statusText = document.getElementById("status");
+    let currentStream;
+    let usingFrontCamera = true;
 
     async function startCamera() {
-      if (stream) stream.getTracks().forEach(track => track.stop());
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+      const constraints = {
+        video: {
+          facingMode: usingFrontCamera ? "user" : "environment"
+        }
+      };
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } });
-        video.srcObject = stream;
-        statusEl.textContent = "Camera ready (" + currentFacingMode + ")";
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
       } catch (err) {
-        statusEl.textContent = "❌ Camera error: " + err.message;
+        console.error("Camera error:", err);
+        statusText.innerHTML = "❌ Cannot access camera";
       }
     }
 
-    switchBtn.addEventListener('click', () => {
-      currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+    switchBtn.addEventListener("click", () => {
+      usingFrontCamera = !usingFrontCamera;
       startCamera();
     });
 
-    snapBtn.addEventListener('click', async () => {
-      takePhotoAndUpload();
-    });
+    captureBtn.addEventListener("click", async () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    async function takePhotoAndUpload() {
-      const w = video.videoWidth;
-      const h = video.videoHeight;
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, w, h);
-      const dataURL = canvas.toDataURL('image/png');
-      const base64Data = dataURL.replace(/^data:image\/png;base64,/, '');
+      statusText.textContent = "⏳ Uploading...";
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg"));
 
-      statusEl.textContent = "Uploading to Google Drive...";
+      const formData = new FormData();
+      formData.append("file", blob, "photo.jpg");
 
       try {
-        const formData = new FormData();
-        formData.append("file", base64Data);
-        formData.append("type", "image/png");
-
-        const response = await fetch(uploadURL, { method: "POST", body: formData });
-        const result = await response.text();
-        statusEl.textContent = result;
+        const response = await fetch(SCRIPT_URL, { method: "POST", body: formData });
+        if (response.ok) {
+          statusText.innerHTML = "✅ Upload complete!";
+          statusText.className = "success";
+        } else {
+          throw new Error(await response.text());
+        }
       } catch (error) {
-        statusEl.textContent = "❌ Upload failed: " + error.message;
+        console.error(error);
+        statusText.innerHTML = "❌ Upload failed: " + error.message;
+        statusText.className = "error";
       }
-    }
+    });
 
     startCamera();
   </script>
