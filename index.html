@@ -1,98 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>📸 Live Camera Upload</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      padding: 20px;
-      background-color: #f9f9f9;
-    }
-    video, canvas {
-      width: 90%;
-      max-width: 350px;
-      border-radius: 12px;
-      margin-top: 15px;
-      background: #000;
-    }
-    button {
-      margin: 10px;
-      padding: 10px 20px;
-      font-size: 16px;
-      border: none;
-      border-radius: 8px;
-      background-color: #007bff;
-      color: white;
-      cursor: pointer;
-    }
-    #status {
-      margin-top: 15px;
-      font-weight: bold;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live Camera Upload</title>
 </head>
 <body>
-  <h2>📸 Live Camera - Take Photo & Upload</h2>
-  <video id="camera" autoplay playsinline></video>
-  <br>
-  <button id="switchBtn">🔄 Switch Camera</button>
-  <button id="captureBtn">📤 Capture & Upload</button>
+  <h2>📷 Live Camera Capture & Upload</h2>
+  
+  <video id="video" width="300" autoplay></video>
+  <br />
+  <button id="captureBtn">Capture Photo</button>
+  <button id="uploadBtn">Upload</button>
   <p id="status"></p>
-
+  <br />
+  <canvas id="canvas" width="300" height="225" style="display:none;"></canvas>
+  <img id="preview" width="300" style="display:none;" />
+  
   <script>
-    const scriptURL = "https://script.google.com/macros/s/AKfycbwB-6Tk7Qu2gBgsDJ3waBjgDXZa_FQgEfaywAUfijp3XIPGol8rIkblsBjK8xzaXxwcSQ/exec"; // Replace this
-    const video = document.getElementById("camera");
-    const switchBtn = document.getElementById("switchBtn");
-    const captureBtn = document.getElementById("captureBtn");
+    const scriptURL = "YOUR_SCRIPT_URL_HERE"; // 🔴 Replace this with your Apps Script Web App URL
+
+    // Initialize Camera
+    const video = document.getElementById("video");
+    navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+      video.srcObject = stream;
+    });
+
+    const canvas = document.getElementById("canvas");
+    const preview = document.getElementById("preview");
     const status = document.getElementById("status");
 
-    let stream = null;
-    let currentFacing = "environment"; // Back camera by default
+    // Capture from Camera
+    document.getElementById("captureBtn").addEventListener("click", function () {
+      const context = canvas.getContext("2d");
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      preview.src = canvas.toDataURL("image/jpeg");
+      preview.style.display = "block";
+      status.innerText = "✅ Photo captured. Now click Upload.";
+    });
 
-    async function startCamera() {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: currentFacing }
-        });
-        video.srcObject = stream;
-        status.innerText = "📷 Camera is live";
-      } catch (err) {
-        status.innerText = "❌ Camera error: " + err.message;
-      }
-    }
-
-    switchBtn.onclick = () => {
-      currentFacing = currentFacing === "environment" ? "user" : "environment";
-      startCamera();
-    };
-
-    captureBtn.onclick = async () => {
-      if (!stream) {
-        alert("Camera not started!");
-        return;
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      status.innerText = "Uploading...";
-
+    // Upload to Google Drive
+    document.getElementById("uploadBtn").addEventListener("click", function () {
       canvas.toBlob(async (blob) => {
+        status.innerText = "⏳ Uploading...";
         const formData = new FormData();
-        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-        formData.append("file", blob, `photo_${timestamp}.jpg`);
+        formData.append("file", blob, `photo_${Date.now()}.jpg`);
 
         try {
           const res = await fetch(scriptURL, { method: "POST", body: formData });
           const data = await res.json();
+
           if (data.success) {
             status.innerHTML = `✅ Uploaded Successfully! <a href="${data.url}" target="_blank">View File</a>`;
           } else {
@@ -102,10 +59,7 @@
           status.innerText = "❌ Upload error: " + err.message;
         }
       }, "image/jpeg");
-    };
-
-    // Start camera automatically
-    startCamera();
+    });
   </script>
 </body>
 </html>
