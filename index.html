@@ -1,66 +1,97 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Live Camera Upload</title>
+  <title>Auto Upload to Google Drive</title>
+  <style>
+    body {
+      text-align: center;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    video, canvas, img {
+      margin-top: 10px;
+      border-radius: 10px;
+      background: #eee;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+  </style>
 </head>
-<body>
-  <h2>📷 Live Camera Capture & Upload</h2>
-  
-  <video id="video" width="300" autoplay></video>
-  <br />
-  <button id="captureBtn">Capture Photo</button>
-  <button id="uploadBtn">Upload</button>
-  <p id="status"></p>
-  <br />
-  <canvas id="canvas" width="300" height="225" style="display:none;"></canvas>
-  <img id="preview" width="300" style="display:none;" />
-  
-  <script>
-    const scriptURL = "https://script.google.com/macros/s/AKfycby7D6Bf55dH1p-4I9fI_c7yF2WTSezLf7xkvtFE3uVVYHe6crR0dchh-yNrjzE9D8EjDQ/exec"; // 🔴 Replace this with your Apps Script Web App URL
 
-    // Initialize Camera
-    const video = document.getElementById("video");
-    navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
-      video.srcObject = stream;
+<body>
+  <h2>📸 Auto Upload to Google Drive</h2>
+
+  <video id="video" width="320" height="240" autoplay></video>
+  <br />
+  <button id="startCamera">🎥 Start Camera</button>
+  <button id="takeUpload">📤 Take & Upload</button>
+  <p id="status"></p>
+  <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+
+  <script>
+    const scriptURL = "https://script.google.com/macros/s/AKfycby7D6Bf55dH1p-4I9fI_c7yF2WTSezLf7xkvtFE3uVVYHe6crR0dchh-yNrjzE9D8EjDQ/exec"; // 🔴 Replace with your deployed Apps Script URL
+    let videoStream;
+
+    // Start Camera
+    document.getElementById("startCamera").addEventListener("click", async () => {
+      try {
+        videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        document.getElementById("video").srcObject = videoStream;
+      } catch (error) {
+        alert("Camera access denied or not available!");
+      }
     });
 
-    const canvas = document.getElementById("canvas");
-    const preview = document.getElementById("preview");
-    const status = document.getElementById("status");
+    // Take & Upload
+    document.getElementById("takeUpload").addEventListener("click", () => {
+      const video = document.getElementById("video");
+      const canvas = document.getElementById("canvas");
+      const status = document.getElementById("status");
 
-    // Capture from Camera
-    document.getElementById("captureBtn").addEventListener("click", function () {
+      // Capture frame
       const context = canvas.getContext("2d");
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      preview.src = canvas.toDataURL("image/jpeg");
-      preview.style.display = "block";
-      status.innerText = "✅ Photo captured. Now click Upload.";
-    });
 
-    // Upload to Google Drive
-    document.getElementById("uploadBtn").addEventListener("click", function () {
+      // Convert to Blob and upload
       canvas.toBlob(async (blob) => {
+        if (!blob) {
+          status.innerText = "❌ Failed to capture image.";
+          return;
+        }
+
         status.innerText = "⏳ Uploading...";
         const formData = new FormData();
-        formData.append("file", blob, `photo_${Date.now()}.jpg`);
+        formData.append("file", blob, `photo_${new Date().toISOString()}.jpg`);
 
         try {
-          const res = await fetch(scriptURL, { method: "POST", body: formData });
-          const data = await res.json();
+          const response = await fetch(scriptURL, {
+            method: "POST",
+            body: formData,
+          });
 
-          if (data.success) {
-            status.innerHTML = `✅ Uploaded Successfully! <a href="${data.url}" target="_blank">View File</a>`;
+          const result = await response.json();
+
+          if (result.success) {
+            status.innerHTML = `✅ Uploaded! <a href="${result.url}" target="_blank">View Image</a>`;
           } else {
-            status.innerText = "❌ Upload failed: " + data.message;
+            status.innerText = `❌ Upload failed: ${result.message}`;
           }
-        } catch (err) {
-          status.innerText = "❌ Upload error: " + err.message;
+        } catch (error) {
+          status.innerText = `❌ Error: ${error}`;
         }
       }, "image/jpeg");
     });
   </script>
 </body>
 </html>
-
