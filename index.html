@@ -1,100 +1,121 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Photo Upload</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      margin-top: 50px;
-    }
-    input, button {
-      margin-top: 10px;
-      padding: 10px;
-      font-size: 16px;
-    }
-    #preview {
-      display: block;
-      width: 100%;
-      max-width: 300px;
-      margin: 10px auto;
-      border-radius: 8px;
-    }
-    #status {
-      color: green;
-      font-weight: bold;
-      margin-top: 10px;
-    }
-  </style>
-</head>
-<body>
-
-  <h2>📸 Upload a Photo</h2>
-
-  <form id="uploadForm" method="POST" enctype="multipart/form-data">
-    <input type="file" id="file" name="file" accept="image/*" capture="environment" required>
-    <img id="preview" src="" alt="Preview" />
-    <button type="submit">Upload</button>
-  </form>
-
-  <div id="status"></div>
-
-  <script>
-    const form = document.getElementById("uploadForm");
-    const fileInput = document.getElementById("file");
-    const preview = document.getElementById("preview");
-    const status = document.getElementById("status");
-
-    // Show image preview (mobile & desktop)
-    fileInput.addEventListener("change", (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        preview.src = URL.createObjectURL(file);
-        preview.style.display = "block";
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📸 Auto Upload to Google Drive</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f2f5f8;
+        text-align: center;
+        padding: 30px;
       }
-    });
-
-    // Handle upload
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const file = fileInput.files[0];
-      if (!file) {
-        alert("Please select a file first!");
-        return;
+      h2 {
+        color: #222;
       }
+      video, canvas {
+        width: 300px;
+        height: 300px;
+        border-radius: 10px;
+        object-fit: cover;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        margin: 10px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      #status {
+        margin-top: 15px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>📸 Auto Upload to Google Drive</h2>
 
-      status.textContent = "Uploading...";
+    <video id="camera" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
 
-      const formData = new FormData();
-      formData.append("file", file);
+    <div>
+      <button id="switchCamera">🔁 Switch Camera</button>
+      <button id="capture">📸 Take & Upload</button>
+    </div>
 
-      try {
-        const response = await fetch(
-          "https://script.google.com/macros/s/AKfycbyNkQnuBc_oVb4jlmyIFgFKaxESLJzdsj1qESxIsuFE8e0uTzqyzAl1bpzuMSA5t2ij/exec",
-          {
-            method: "POST",
-            body: formData,
-            mode: "no-cors",
+    <p id="status"></p>
+
+    <script>
+      const video = document.getElementById('camera');
+      const canvas = document.getElementById('canvas');
+      const status = document.getElementById('status');
+
+      const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyez_KN8GfKhjGfgfaAnRZS0DEkwkEI9Tf5Slpwg-UUP5PtrBDGYZrFPLnKl-xaX7j1VA/exec";
+
+      let currentFacingMode = "environment";
+      let stream;
+
+      async function startCamera() {
+        try {
+          if (stream) {
+            const tracks = stream.getTracks();
+            tracks.forEach(track => track.stop());
           }
-        );
 
-        // Since "no-cors" mode hides the response, just assume success
-        status.textContent = "✅ Upload successful!";
-        fileInput.value = "";
-        preview.src = "";
-      } catch (err) {
-        console.error(err);
-        status.textContent = "❌ Upload failed. Please try again.";
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: currentFacingMode }
+          });
+
+          video.srcObject = stream;
+          await video.play();
+        } catch (error) {
+          console.error(error);
+          status.textContent = "⚠️ Camera access failed. Please allow permissions.";
+        }
       }
-    });
-  </script>
 
-</body>
-</html>
+      document.getElementById('switchCamera').addEventListener('click', () => {
+        currentFacingMode = currentFacingMode === "environment" ? "user" : "environment";
+        startCamera();
+      });
 
+      document.getElementById('capture').addEventListener('click', async () => {
+        const context = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        status.textContent = "⏳ Uploading...";
+
+        try {
+          const response = await fetch(SCRIPT_URL, {
+            method: "POST",
+            body: new URLSearchParams({ image: dataUrl })
+          });
+
+          const text = await response.text();
+          if (response.ok && text.includes("Uploaded")) {
+            status.textContent = "✅ Upload complete!";
+          } else {
+            status.textContent = "❌ Upload failed: " + text;
+          }
+        } catch (err) {
+          console.error(err);
+          status.textContent = "❌ Upload failed: " + err.message;
+        }
+      });
+
+      startCamera();
+    </script>
+  </body>
+  </html>
 
 
 
